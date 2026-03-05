@@ -916,7 +916,7 @@ async fn handle_mal_result(ctx: Context<'_>, mal_anime: JikanAnimeData) -> Resul
         .map(|ids| format_cross_platform_links(ids))
         .unwrap_or_else(|| format!("[MyAnimeList](https://myanimelist.net/anime/{})", mal_anime.mal_id));
 
-    let alid = cross_platform_ids
+    let _alid = cross_platform_ids
         .as_ref()
         .and_then(|ids| ids.anilist_id)
         .unwrap_or(0);

@@ -5,8 +5,9 @@ use crate::{Context, Error, colors};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::CreateAttachment;
 use uuid::Uuid;
-use yt_dlp::Youtube;
+use yt_dlp::Downloader;
 use yt_dlp::client::deps::Libraries;
+use yt_dlp::VideoSelection;
 
 async fn edit_audio_clip(
     input_path: &std::path::Path,
@@ -58,11 +59,13 @@ pub async fn yt_edit(
 
     log::info!("Downloading and editing clip from URL: {}", url);
 
-    let fetcher: Youtube = Youtube::new(libraries, output_dir.clone()).await?;
+    let downloader = Downloader::builder(libraries, output_dir.clone())
+        .build()
+        .await?;
 
-    log::info!("Initialized Youtube fetcher.");
+    log::info!("Initialized downloader.");
 
-    let video = fetcher.fetch_video_infos(url.clone()).await?;
+    let video = downloader.fetch_video_infos(url.clone()).await?;
     log::info!("Fetched video info: {:?}", video.title);
     log::debug!("Fetched video info: {:?}", video.extractor_info);
 
@@ -77,8 +80,11 @@ pub async fn yt_edit(
 
     log::info!("Downloading audio to temporary file: {}", audio_filename);
 
-    let audio_path: PathBuf = fetcher
-        .download_format(audio_format, &audio_filename)
+    // Download the best audio format
+    let audio_path = output_dir.join(&audio_filename);
+    downloader
+        .download(&video, &audio_path)
+        .execute_audio_stream()
         .await?;
 
     let clip_path = output_dir.join(&clip_filename);
@@ -95,7 +101,7 @@ pub async fn yt_edit(
             .fields(vec![
                 ("Original Video", format!("[Link]({})", url), false),
                 ("Duration", format!("{} seconds", duration), true),
-                ("Views", format!("{}", video.view_count), true),
+                ("Views", format!("{}", video.view_count.unwrap_or(0)), true),
                 ("Likes", format!("{}", video.like_count.unwrap_or(0)), true),
                 (
                     "Comments",
@@ -104,7 +110,7 @@ pub async fn yt_edit(
                 ),
             ])
             .url(url)
-            .thumbnail(video.thumbnail)
+            .thumbnail(video.thumbnail.unwrap_or_default())
             .color(colors::PINK)
             .footer(serenity::CreateEmbedFooter::new(format!(
                 "Requested by {}",
