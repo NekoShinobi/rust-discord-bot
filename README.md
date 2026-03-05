@@ -20,60 +20,74 @@ Feature set is mostly what I find useful with a few for fun commands here and th
 
 ### AI
 
-- It uses a local ollama instance in order to make prompts when @mentioning the bot.
-- Currently specifically created with gemma3 in mind, but could be expanded in the future.
-- Stable Diffisuion with a self hosted instance (Currently not available)
+- Conversational AI using local Ollama instance when @mentioning the bot
+- Currently optimized for gemma3, but expandable to other models
+- Stable Diffusion integration with self-hosted instance (Currently not available)
 
 ### Anime
-- Guess the OP
-- Some integrations with [ShokoServer](https://github.com/ShokoAnime/ShokoServer/)
-- Some integrations with Sonarr
+- Guess the OP game
+- Integrations with [ShokoServer](https://github.com/ShokoAnime/ShokoServer/) for anime library management
+- Sonarr integration for anime series tracking
 
 ### EmbedFix
-- Fix embeds for instagram, reddit, twitter.
+- Fixes broken embeds for Instagram, Reddit (vxreddit), and Twitter (fxtwitter) links
 
 ### Language
-- Kanji search
+- Kanji and Chinese character search and information
+- Detailed character breakdowns and meanings
 
 ### Music
-(Currently broken)
+- YouTube audio clip extraction (download and edit clips from YouTube videos)
+- Voice channel music playback with queue system
 
-### Permission system
-- Basic permission system of admin/mod/trusted.
-- Currently just used to prevent users from using certain commands that can be destructive.
+### Permission System
+- Role-based permission system (admin/mod/trusted)
+- Prevents unauthorized users from using destructive or restricted commands
 
 ### Random
-- ping/bing
-- avatar
-- uptime
-- userinfo
-- guildinfo
-- randomfox
-- weather
+- Basic utility commands: ping/bing, avatar, uptime, userinfo, guildinfo
+- Random fox images
+- Weather information lookup
+- Deadge command
+- Custom response system based on triggers
 
 ### AYDY (Are you dead yet?)
-- Based on the chinese app, where a message will be shown every 24 hours to the group chat. People can enroll, and if they're enrolled but dont' click the button for 48 hours, it will mark them in a separate table.
+- Inspired by the Chinese "报平安" concept
+- Daily check-in system with 24-hour reminder messages
+- Tracks enrollment and marks users inactive after 48 hours of no response
 
 ### Response System
-- Based on a toml config file (/app/config.toml), you can create various different reactions you would like the bot to have.
+- Configurable trigger-based bot reactions via TOML config file (/app/config.toml)
+- Supports custom automated responses to specific messages or patterns
 
 ### Stream Following
-- Sends a message when a user is streaming. Currently only kick support.
+- Automated notifications when followed users go live
+- Currently supports Kick streaming platform
 
 ### Ticketing System
-WIP
+- User support ticket creation and management (Work in Progress)
 
-### TMDB
-- Basic support to search movies and tv shows.
+### TMDB (The Movie Database)
+- Movie search with detailed information
+- TV show search and information lookup
 
-### Papers
-- A system to create a persistent embed message that can be used to assign roles on click, or can be used as a generic modifiable embedded message.
+### Utility
 
-### Bot Profile
-- Commands to help with modifying the bot profile.
+#### Papers
+- Persistent embed message system for role assignment
+- Generic modifiable embedded messages for server information
 
-### Tags
-- Essentially a fancy discord key-value store.
+#### Bot Profile
+- Commands for modifying bot profile (avatar, status, etc.)
+
+#### Tags
+- Server-specific key-value storage system
+- Create, retrieve, and manage custom text snippets
 
 ### Website
-- There is also a website that gets hosted on port 8080, that will have some nice tools for administrators like list of emojis, tags, commands, etc.
+- Web interface hosted on port 8080
+- Administrative tools including:
+  - Emoji list viewer
+  - Tag management
+  - Command documentation
+  - Server configuration
