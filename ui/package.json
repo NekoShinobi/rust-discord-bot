@@ -37,7 +37,7 @@
 		"tailwindcss": "^4.1.17",
 		"typescript": "^6.0.0",
 		"typescript-eslint": "^8.48.1",
-		"vite": "^7.2.6"
+		"vite": "^8.0.0"
 	},
 	"dependencies": {
 		"dompurify": "^3.3.1",
