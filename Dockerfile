@@ -23,7 +23,7 @@ COPY . .
 RUN --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
     cargo build --release
 
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 WORKDIR /app
 
 RUN DEBIAN_FRONTEND=noninteractive apt update && apt upgrade -y && apt install -y curl python3 ffmpeg && apt clean && rm -rf /var/lib/apt/lists/*
