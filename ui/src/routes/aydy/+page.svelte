@@ -5,6 +5,10 @@
 		user_name: string;
 		last_response: number;
 		enrolled_at: number;
+		death_count: number;
+		last_alive_start: number;
+		alive_days: number;
+		is_dead: boolean;
 	}
 
 	interface AydyState {
@@ -77,6 +81,13 @@
 
 	function getUserCount(state: AydyState): number {
 		return Object.keys(state.enrolled_users).length;
+	}
+
+	function getSortedUsers(state: AydyState): Array<[string, UserStatus]> {
+		return Object.entries(state.enrolled_users).sort((a, b) => {
+			// Sort by alive_days descending (longest alive streaks first)
+			return (b[1].alive_days || 0) - (a[1].alive_days || 0);
+		});
 	}
 
 	onMount(() => {
@@ -188,33 +199,52 @@
 										<table class="w-full text-sm">
 											<thead class="bg-gray-800/50 border-b border-gray-700">
 												<tr>
-													<th class="px-4 py-2 text-left text-gray-300 font-medium">User ID</th>
 													<th class="px-4 py-2 text-left text-gray-300 font-medium">Username</th>
+													<th class="px-4 py-2 text-left text-gray-300 font-medium">Alive Streak</th>
+													<th class="px-4 py-2 text-left text-gray-300 font-medium">Deaths</th>
 													<th class="px-4 py-2 text-left text-gray-300 font-medium">Last Response</th>
-													<th class="px-4 py-2 text-left text-gray-300 font-medium">Enrolled At</th>
 													<th class="px-4 py-2 text-left text-gray-300 font-medium">Status</th>
 												</tr>
 											</thead>
 											<tbody class="divide-y divide-gray-700/50">
-												{#each Object.entries(state.enrolled_users) as [userId, user]}
+												{#each getSortedUsers(state) as [userId, user], index}
 													{@const hoursSinceResponse = Math.floor((Date.now() / 1000 - user.last_response) / 3600)}
-													{@const isDead = hoursSinceResponse >= 48}
+													{@const isDead = user.is_dead ?? (hoursSinceResponse >= 48)}
 													<tr class="hover:bg-gray-700/20 transition-colors {isDead ? 'bg-red-900/10' : ''}">
 														<td class="px-4 py-3">
-															<code class="text-blue-400">{userId}</code>
+															<div class="flex items-center gap-2">
+																{#if index < 3 && !isDead}
+																	<span class="text-xl">{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
+																{/if}
+																<div>
+																	<div class="text-white font-medium">{user.user_name}</div>
+																	<code class="text-blue-400 text-xs">{userId}</code>
+																</div>
+															</div>
 														</td>
-														<td class="px-4 py-3 text-white">{user.user_name}</td>
+														<td class="px-4 py-3">
+															<div class="text-white font-semibold">
+																{user.alive_days?.toFixed(1) ?? '0.0'} days
+															</div>
+															<span class="text-gray-500 text-xs">Since {formatTimestamp(user.last_alive_start)}</span>
+														</td>
+														<td class="px-4 py-3">
+															{#if user.death_count > 0}
+																<span class="inline-flex items-center px-2 py-1 rounded-full text-sm font-medium bg-red-500/20 text-red-400 border border-red-500/30">
+																	💀 {user.death_count}
+																</span>
+															{:else}
+																<span class="text-gray-500">—</span>
+															{/if}
+														</td>
 														<td class="px-4 py-3 text-gray-300">
 															{formatTimestamp(user.last_response)}
 															<span class="text-gray-500 text-xs block">{getRelativeTime(user.last_response)}</span>
 														</td>
-														<td class="px-4 py-3 text-gray-300">
-															{formatTimestamp(user.enrolled_at)}
-														</td>
 														<td class="px-4 py-3">
 															{#if isDead}
 																<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">
-																	⚠️ No response (48h+)
+																	⚠️ Dead (48h+)
 																</span>
 															{:else if hoursSinceResponse >= 24}
 																<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
@@ -222,7 +252,7 @@
 																</span>
 															{:else}
 																<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400 border border-green-500/30">
-																	✓ Active
+																	✓ Alive
 																</span>
 															{/if}
 														</td>

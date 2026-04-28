@@ -19,7 +19,7 @@
 		"@sveltejs/adapter-auto": "^7.0.0",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.49.1",
-		"@sveltejs/vite-plugin-svelte": "^6.2.1",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/typography": "^0.5.19",
 		"@tailwindcss/vite": "^4.1.17",
 		"@types/dompurify": "^3.0.5",
@@ -37,7 +37,7 @@
 		"tailwindcss": "^4.1.17",
 		"typescript": "^6.0.0",
 		"typescript-eslint": "^8.48.1",
-		"vite": "^7.2.6"
+		"vite": "^8.0.8"
 	},
 	"dependencies": {
 		"dompurify": "^3.3.1",

@@ -53,6 +53,33 @@ const TICKETS: redb::TableDefinition<&str, &str> = redb::TableDefinition::new("t
 const ACTIVE_TICKETS: redb::TableDefinition<&str, &str> =
     redb::TableDefinition::new("active_tickets");
 
+fn replace_usernames_with_mentions(response: &str, guild: &serenity::Guild) -> String {
+    use regex::Regex;
+    let mut result = response.to_string();
+    for (user_id, member) in &guild.members {
+        let mention = format!("<@{}>", user_id);
+        let mut names: Vec<&str> = vec![member.user.name.as_str()];
+        if let Some(nick) = &member.nick {
+            names.push(nick.as_str());
+        }
+        if let Some(global) = &member.user.global_name {
+            names.push(global.as_str());
+        }
+        names.dedup();
+        for name in names {
+            if name.len() < 3 {
+                continue;
+            }
+            let escaped = regex::escape(name);
+            let pattern = format!(r"(?i)\b{}\b", escaped);
+            if let Ok(re) = Regex::new(&pattern) {
+                result = re.replace_all(&result, mention.as_str()).to_string();
+            }
+        }
+    }
+    result
+}
+
 fn split_string_chunks(long_string: &str, chunk_size: usize) -> Vec<String> {
     long_string
         .chars()
@@ -123,6 +150,16 @@ async fn event_handler(
 
                     let response =
                         ai::localai::get_gpt_response(new_message, ctx, system_prompt).await?;
+
+                    let response = if let Some(guild_id) = new_message.guild_id {
+                        if let Some(guild) = ctx.cache.guild(guild_id) {
+                            replace_usernames_with_mentions(&response, &guild)
+                        } else {
+                            response
+                        }
+                    } else {
+                        response
+                    };
 
                     log::info!("Response: {:#?}", response);
                     let chunks = split_string_chunks(&response, 2000);
@@ -263,6 +300,7 @@ async fn discordbot(subsys: &mut tokio_graceful_shutdown::SubsystemHandle) -> Re
                 random::basic::uptime(),
                 random::basic::userinfo(),
                 random::basic::guildinfo(),
+                random::time::time(),
                 random::deadge::aydy(),
                 random::fox::fox(),
                 random::weather::weather(),

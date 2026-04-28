@@ -356,40 +356,62 @@ async fn check_and_notify_streams(http: &serenity::Http) -> Result<(), Error> {
                         if let Some(state) = existing_state {
                             // Compare start times to see if it's the same stream session
                             if current_start_time == state.start_time {
-                                // Same stream session, edit the existing message
-                                let message = discord_channel.message(http, state.message_id).await;
-                                if let Ok(mut msg) = message {
-                                    let edit = serenity::EditMessage::new().embed(embed);
-                                    if let Err(e) = msg.edit(http, edit).await {
-                                        log::error!("Failed to edit stream notification: {}", e);
-                                        // If edit fails, remove the entry and send a new one next time
-                                        let tx = db.begin_write()?;
-                                        {
-                                            let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
-                                            table.remove(stream_key.as_str())?;
-                                        }
-                                        tx.commit()?;
-                                    }
+                                // Check if this is a failed state (message_id == 1)
+                                if state.message_id == 1 {
+                                    // Previous send failed, don't retry for this stream session
+                                    log::debug!(
+                                        "Skipping notification for {} - previous send failed",
+                                        follow.channel_name
+                                    );
                                 } else {
-                                    // Message doesn't exist anymore, remove from tracking and send new one
-                                    let message = serenity::CreateMessage::new().embed(embed);
-
-                                    if let Ok(sent_msg) =
-                                        discord_channel.send_message(http, message).await
-                                    {
-                                        let new_state = LiveStreamState {
-                                            message_id: sent_msg.id.get(),
-                                            start_time: current_start_time,
-                                        };
-                                        let tx = db.begin_write()?;
-                                        {
-                                            let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
-                                            let value = serde_json::to_string(&new_state)?;
-                                            table.insert(stream_key.as_str(), value.as_str())?;
+                                    // Same stream session, edit the existing message
+                                    let message = discord_channel.message(http, state.message_id).await;
+                                    if let Ok(mut msg) = message {
+                                        let edit = serenity::EditMessage::new().embed(embed);
+                                        if let Err(e) = msg.edit(http, edit).await {
+                                            log::error!("Failed to edit stream notification: {}", e);
+                                            // If edit fails, remove the entry and send a new one next time
+                                            let tx = db.begin_write()?;
+                                            {
+                                                let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
+                                                table.remove(stream_key.as_str())?;
+                                            }
+                                            tx.commit()?;
                                         }
-                                        tx.commit()?;
                                     } else {
-                                        log::error!("Failed to send stream notification");
+                                        // Message doesn't exist anymore, remove from tracking and send new one
+                                        let message = serenity::CreateMessage::new().embed(embed);
+
+                                        match discord_channel.send_message(http, message).await {
+                                            Ok(sent_msg) => {
+                                                let new_state = LiveStreamState {
+                                                    message_id: sent_msg.id.get(),
+                                                    start_time: current_start_time.clone(),
+                                                };
+                                                let tx = db.begin_write()?;
+                                                {
+                                                    let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
+                                                    let value = serde_json::to_string(&new_state)?;
+                                                    table.insert(stream_key.as_str(), value.as_str())?;
+                                                }
+                                                tx.commit()?;
+                                            }
+                                            Err(e) => {
+                                                log::error!("Failed to send stream notification: {}", e);
+                                                // Save failed state to prevent retry spam
+                                                let failed_state = LiveStreamState {
+                                                    message_id: 1, // Marker for failed send
+                                                    start_time: current_start_time.clone(),
+                                                };
+                                                let tx = db.begin_write()?;
+                                                {
+                                                    let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
+                                                    let value = serde_json::to_string(&failed_state)?;
+                                                    table.insert(stream_key.as_str(), value.as_str())?;
+                                                }
+                                                tx.commit()?;
+                                            }
+                                        }
                                     }
                                 }
                             } else {
@@ -401,22 +423,35 @@ async fn check_and_notify_streams(http: &serenity::Http) -> Result<(), Error> {
 
                                 let message = serenity::CreateMessage::new().embed(embed);
 
-                                if let Ok(sent_msg) =
-                                    discord_channel.send_message(http, message).await
-                                {
-                                    let new_state = LiveStreamState {
-                                        message_id: sent_msg.id.get(),
-                                        start_time: current_start_time,
-                                    };
-                                    let tx = db.begin_write()?;
-                                    {
-                                        let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
-                                        let value = serde_json::to_string(&new_state)?;
-                                        table.insert(stream_key.as_str(), value.as_str())?;
+                                match discord_channel.send_message(http, message).await {
+                                    Ok(sent_msg) => {
+                                        let new_state = LiveStreamState {
+                                            message_id: sent_msg.id.get(),
+                                            start_time: current_start_time.clone(),
+                                        };
+                                        let tx = db.begin_write()?;
+                                        {
+                                            let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
+                                            let value = serde_json::to_string(&new_state)?;
+                                            table.insert(stream_key.as_str(), value.as_str())?;
+                                        }
+                                        tx.commit()?;
                                     }
-                                    tx.commit()?;
-                                } else {
-                                    log::error!("Failed to send stream notification");
+                                    Err(e) => {
+                                        log::error!("Failed to send stream notification: {}", e);
+                                        // Save state with dummy message_id to prevent retry spam
+                                        let failed_state = LiveStreamState {
+                                            message_id: 1, // Marker for failed send
+                                            start_time: current_start_time.clone(),
+                                        };
+                                        let tx = db.begin_write()?;
+                                        {
+                                            let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
+                                            let value = serde_json::to_string(&failed_state)?;
+                                            table.insert(stream_key.as_str(), value.as_str())?;
+                                        }
+                                        tx.commit()?;
+                                    }
                                 }
                             }
                         } else {
@@ -427,7 +462,7 @@ async fn check_and_notify_streams(http: &serenity::Http) -> Result<(), Error> {
                                 Ok(sent_msg) => {
                                     let new_state = LiveStreamState {
                                         message_id: sent_msg.id.get(),
-                                        start_time: current_start_time,
+                                        start_time: current_start_time.clone(),
                                     };
                                     let tx = db.begin_write()?;
                                     {
@@ -439,6 +474,18 @@ async fn check_and_notify_streams(http: &serenity::Http) -> Result<(), Error> {
                                 }
                                 Err(e) => {
                                     log::error!("Failed to send stream notification: {}", e);
+                                    // Save state with dummy message_id to prevent retry spam
+                                    let failed_state = LiveStreamState {
+                                        message_id: 1, // Marker for failed send
+                                        start_time: current_start_time.clone(),
+                                    };
+                                    let tx = db.begin_write()?;
+                                    {
+                                        let mut table = tx.open_table(LIVE_STREAMS_STATE)?;
+                                        let value = serde_json::to_string(&failed_state)?;
+                                        table.insert(stream_key.as_str(), value.as_str())?;
+                                    }
+                                    tx.commit()?;
                                 }
                             }
                         }

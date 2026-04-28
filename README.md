@@ -21,7 +21,7 @@ Feature set is mostly what I find useful with a few for fun commands here and th
 ### AI
 
 - Conversational AI using local Ollama instance when @mentioning the bot
-- Currently optimized for gemma3, but expandable to other models
+- Currently optimized for 4, but expandable to other models
 - Stable Diffusion integration with self-hosted instance (Currently not available)
 
 ### Anime

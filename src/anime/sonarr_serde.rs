@@ -37,7 +37,7 @@ pub struct Show {
     pub root_folder_path: String,
     pub certification: Option<String>,
     pub genres: Vec<String>,
-    pub tags: Vec<String>,
+    pub tags: Vec<u32>,
     pub added: DateTime<Utc>,
     pub ratings: Ratings,
     pub statistics: Statistics,

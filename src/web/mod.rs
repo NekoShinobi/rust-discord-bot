@@ -28,6 +28,7 @@ pub async fn start_web_server(subsys: &mut tokio_graceful_shutdown::SubsystemHan
             .service(services::tags::delete_tag)
             // AYDY endpoints
             .service(services::aydy::get_aydy)
+            .service(services::aydy::get_aydy_leaderboard)
             // Ticket endpoints
             .service(services::tickets::get_tickets)
             .service(services::tickets::get_ticket)

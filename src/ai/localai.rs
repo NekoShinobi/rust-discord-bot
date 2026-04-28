@@ -40,7 +40,7 @@ impl Default for OllamaOptions {
         OllamaOptions {
             num_ctx: 4096,
             temperature: 0.7,
-            num_predict: 1000,
+            num_predict: 10000,
         }
     }
 }
@@ -62,7 +62,7 @@ impl ModelData {
 impl Default for ModelData {
     fn default() -> Self {
         ModelData {
-            model: "gemma3:27b".to_string(), // TODO: Configurable
+            model: "gemma4:26b".to_string(), // TODO: Configurable
             messages: VecDeque::new(),
             options: OllamaOptions::default(),
             stream: false,
