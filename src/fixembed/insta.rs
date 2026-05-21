@@ -14,7 +14,7 @@ pub async fn check_instagram_embed(
 
         if let Ok(parsed_url) = Url::parse(url) {
             let path = parsed_url.path();
-            let fixed_url = format!("https://d.vxinstagram.com{}", path);
+            let fixed_url = format!("https://vxinstagram.com{}", path);
 
             message
                 .reply(

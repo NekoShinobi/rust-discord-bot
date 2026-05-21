@@ -12,6 +12,8 @@ mod random;
 mod streams;
 mod tickets;
 mod tmdb;
+mod brain;
+mod rag;
 mod utility;
 mod web;
 
@@ -52,6 +54,10 @@ const PAPERS: redb::TableDefinition<&str, &str> = redb::TableDefinition::new("pa
 const TICKETS: redb::TableDefinition<&str, &str> = redb::TableDefinition::new("tickets");
 const ACTIVE_TICKETS: redb::TableDefinition<&str, &str> =
     redb::TableDefinition::new("active_tickets");
+pub const RAG_CHANNELS: redb::TableDefinition<&str, &str> =
+    redb::TableDefinition::new("rag_channels");
+pub const BRAIN_INDEX: redb::TableDefinition<&str, &str> =
+    redb::TableDefinition::new("brain_index");
 
 fn replace_usernames_with_mentions(response: &str, guild: &serenity::Guild) -> String {
     use regex::Regex;
@@ -129,6 +135,14 @@ async fn event_handler(
             if new_message.author.id == ctx.cache.current_user().id {
                 break 'message_match;
             }
+
+            if rag::is_channel_registered(new_message.channel_id.get()) {
+                let msg_clone = new_message.clone();
+                tokio::spawn(async move {
+                    let _ = rag::ingest::ingest_message(msg_clone).await;
+                });
+            }
+
             if new_message.mentions.contains(&**ctx.cache.current_user()) {
                 if lower_case_msg.contains("please wipe all context")
                     && new_message.author.id == *env::AUTHOR_ID
@@ -148,24 +162,99 @@ async fn event_handler(
                         .map(|ai| ai.system_prompt.as_str())
                         .unwrap_or("You are a helpful AI assistant.");
 
-                    let response =
+                    let rin_response =
                         ai::localai::get_gpt_response(new_message, ctx, system_prompt).await?;
 
-                    let response = if let Some(guild_id) = new_message.guild_id {
+                    let text = if let Some(guild_id) = new_message.guild_id {
                         if let Some(guild) = ctx.cache.guild(guild_id) {
-                            replace_usernames_with_mentions(&response, &guild)
+                            replace_usernames_with_mentions(&rin_response.text, &guild)
                         } else {
-                            response
+                            rin_response.text.clone()
                         }
                     } else {
-                        response
+                        rin_response.text.clone()
                     };
 
-                    log::info!("Response: {:#?}", response);
-                    let chunks = split_string_chunks(&response, 2000);
-                    log::info!("Chunks: {:#?}", chunks);
-                    for chunk in chunks.iter() {
-                        new_message.reply(ctx, chunk.to_string()).await?;
+                    log::info!("Response: {:#?}", rin_response);
+
+                    // Build reply — text chunks + optional embed on the first chunk
+                    let chunks = split_string_chunks(&text, 2000);
+                    let mut bot_reply_id: Option<u64> = None;
+                    for (i, chunk) in chunks.iter().enumerate() {
+                        let reply = if i == 0 {
+                            if let Some(embed_data) = &rin_response.embed {
+                                let mut embed = serenity::CreateEmbed::new().color(0x9B59B6u32);
+                                if let Some(t) = &embed_data.title {
+                                    embed = embed.title(t);
+                                }
+                                if let Some(d) = &embed_data.description {
+                                    embed = embed.description(d);
+                                }
+                                if let Some(fields) = &embed_data.fields {
+                                    for f in fields {
+                                        embed = embed.field(&f.name, &f.value, false);
+                                    }
+                                }
+                                if let Some(footer) = &embed_data.footer {
+                                    embed = embed.footer(serenity::CreateEmbedFooter::new(footer));
+                                }
+                                new_message
+                                    .channel_id
+                                    .send_message(
+                                        ctx,
+                                        serenity::CreateMessage::new()
+                                            .reference_message(new_message)
+                                            .content(chunk.to_string())
+                                            .embed(embed),
+                                    )
+                                    .await?
+                            } else {
+                                new_message.reply(ctx, chunk.to_string()).await?
+                            }
+                        } else {
+                            new_message.reply(ctx, chunk.to_string()).await?
+                        };
+                        if bot_reply_id.is_none() {
+                            bot_reply_id = Some(reply.id.get());
+                        }
+
+                        // React to Rin's own reply
+                        if i == 0 {
+                            if let Some(emoji) = &rin_response.react_self {
+                                if !emoji.is_empty() {
+                                    let _ = reply
+                                        .react(ctx, serenity::ReactionType::Unicode(emoji.clone()))
+                                        .await;
+                                }
+                            }
+                        }
+                    }
+
+                    // React to the user's message
+                    if let Some(emoji) = &rin_response.react_user {
+                        if !emoji.is_empty() {
+                            let _ = new_message
+                                .react(ctx, serenity::ReactionType::Unicode(emoji.clone()))
+                                .await;
+                        }
+                    }
+
+                    // Ingest the bot's response into RAG so it becomes part of channel history
+                    if let Some(reply_id) = bot_reply_id {
+                        let channel_id = new_message.channel_id.get();
+                        if rag::is_channel_registered(channel_id) {
+                            let text_clone = rin_response.text.clone();
+                            tokio::spawn(async move {
+                                let _ = rag::ingest::ingest_raw(
+                                    reply_id,
+                                    channel_id,
+                                    "Rin",
+                                    &text_clone,
+                                    chrono::Utc::now().timestamp(),
+                                )
+                                .await;
+                            });
+                        }
                     }
 
                     typing.stop();
@@ -277,6 +366,8 @@ async fn discordbot(subsys: &mut tokio_graceful_shutdown::SubsystemHandle) -> Re
             tx.open_table(PAPERS).unwrap();
             tx.open_table(TICKETS).unwrap();
             tx.open_table(ACTIVE_TICKETS).unwrap();
+            tx.open_table(RAG_CHANNELS).unwrap();
+            tx.open_table(BRAIN_INDEX).unwrap();
             tx.commit().unwrap();
         }
         db.compact().unwrap();
@@ -285,6 +376,10 @@ async fn discordbot(subsys: &mut tokio_graceful_shutdown::SubsystemHandle) -> Re
 
     HTTP_CLIENT.get_or_init(reqwest::Client::new);
     REACTION_CONFIG.get_or_init(|| config::load_config().unwrap());
+
+    if let Err(e) = rag::init().await {
+        log::warn!("Qdrant initialization failed, RAG disabled: {:?}", e);
+    }
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -325,9 +420,14 @@ async fn discordbot(subsys: &mut tokio_graceful_shutdown::SubsystemHandle) -> Re
                 tickets::force_close(),
                 tmdb::movie(),
                 tmdb::tv(),
+                rag::commands::rag_register(),
+                rag::commands::rag_unregister(),
+                rag::commands::rag_status(),
+                rag::commands::rag_search(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("~".into()),
+                mention_as_prefix: false,
                 ..Default::default()
             },
             on_error: |error| {
@@ -642,6 +742,12 @@ async fn discordbot(subsys: &mut tokio_graceful_shutdown::SubsystemHandle) -> Re
     let http_clone2 = client.http.clone();
     tokio::spawn(async move {
         random::deadge::start_aydy_checker(http_clone2).await;
+    });
+
+    // Start the RAG backfill background task
+    let http_clone3 = client.http.clone();
+    tokio::spawn(async move {
+        rag::backfill::backfill_loop(http_clone3).await;
     });
 
     log::info!("Starting Discord Client...");

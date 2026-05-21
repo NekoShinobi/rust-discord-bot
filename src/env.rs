@@ -35,3 +35,24 @@ pub static KICK_CLIENT_SECRET: LazyLock<String> =
 
 pub static TMDB_API_KEY: LazyLock<String> =
     LazyLock::new(|| std::env::var("TMDB_API_KEY").unwrap());
+
+pub static QDRANT_URL: LazyLock<String> =
+    LazyLock::new(|| std::env::var("QDRANT_URL").unwrap());
+
+pub static EMBEDDING_MODEL: LazyLock<String> =
+    LazyLock::new(|| std::env::var("EMBEDDING_MODEL").unwrap_or_else(|_| "nomic-embed-text".to_string()));
+
+pub static EMBEDDING_DIM: LazyLock<u64> =
+    LazyLock::new(|| std::env::var("EMBEDDING_DIM").ok().and_then(|v| v.parse().ok()).unwrap_or(768));
+
+pub static QUERY_EXPAND_MODEL: LazyLock<String> =
+    LazyLock::new(|| std::env::var("QUERY_EXPAND_MODEL").unwrap_or_else(|_| "gemma4:e2b".to_string()));
+
+pub static OUTLINE_URL: LazyLock<String> =
+    LazyLock::new(|| std::env::var("OUTLINE_URL").unwrap_or_default());
+
+pub static OUTLINE_API_KEY: LazyLock<String> =
+    LazyLock::new(|| std::env::var("OUTLINE_API_KEY").unwrap_or_default());
+
+pub static OUTLINE_COLLECTION_ID: LazyLock<String> =
+    LazyLock::new(|| std::env::var("OUTLINE_COLLECTION_ID").unwrap_or_default());

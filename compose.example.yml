@@ -14,7 +14,7 @@ services:
       - SONARR_API_KEY=
       - SONARR_URL=https://sonarr.example
       - FOOTER_URL=your.url
-      - OPEN_WEATHER_MAP_API_KEY=
+      - OPENWEATHERMAP_API_KEY=
       - KICK_CLIENT_ID=
       - KICK_CLIENT_SECRET=
       # Currently only ollama.
@@ -22,3 +22,23 @@ services:
       - SHOKO_SERVER_API_KEY=
       - SHOKO_SERVER_URL=https://shoko-server.example
       - SERVE_STATIC_URL=https://static.example
+      - TMDB_API_KEY=
+      - QDRANT_URL=http://qdrant:6334
+      - EMBEDDING_MODEL=nomic-embed-text
+      - QUERY_EXPAND_MODEL=gemma4:e2b
+      # - OUTLINE_URL=https://outline.example
+      # - OUTLINE_API_KEY=
+      # - OUTLINE_COLLECTION_ID=
+    depends_on:
+      - qdrant
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    restart: unless-stopped
+    environment:
+      - QDRANT__TELEMETRY_DISABLED=true
+    volumes:
+      - ./qdrant_storage:/qdrant/storage
+    ports:
+      - 6333:6333
+      - 6334:6334
