@@ -24,7 +24,7 @@
 		"@tailwindcss/vite": "^4.1.17",
 		"@types/dompurify": "^3.0.5",
 		"@types/marked": "^6.0.0",
-		"@types/node": "^25.0.0",
+		"@types/node": "^26.0.0",
 		"eslint": "^10.0.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.13.1",

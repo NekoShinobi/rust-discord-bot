@@ -5,7 +5,7 @@ COPY . .
 RUN --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
     cargo chef prepare --recipe-path recipe.json
 
-FROM node:25-alpine AS frontend-builder
+FROM node:26-alpine AS frontend-builder
 WORKDIR /app/ui
 COPY ui/package.json ui/package-lock.json* ./
 RUN npm ci
